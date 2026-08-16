@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>启元 · 重启</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(160deg, #A8E0DB 0%, #F4C2B6 100%);
+    user-select: none;
+  }
+  #scene { position: fixed; inset: 0; z-index: 1; }
+
+  /* 顶部栏（无黑线，仅品牌与重来） */
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 64px; z-index: 30;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px; pointer-events: none;
+  }
+  .topbar .brand {
+    font-family: 'Noto Serif SC', serif; font-weight: 700;
+    font-size: 22px; letter-spacing: 2px; color: #1A1A1A;
+  }
+  .restart {
+    pointer-events: auto; cursor: pointer; font-family: 'Inter'; font-weight: 600;
+    font-size: 13px; color: #1A1A1A; border: 1px solid rgba(26,26,26,0.4);
+    background: rgba(255,255,255,0.3); padding: 7px 16px; border-radius: 999px;
+    transition: background 0.2s;
+  }
+  .restart:hover { background: rgba(255,255,255,0.6); }
+
+  /* 底部进度点 + 提示 */
+  .hud {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 30;
+    font-family: 'Inter'; font-size: 12px; font-weight: 600; color: #1A1A1A; letter-spacing: 2px;
+    display: flex; gap: 10px; align-items: center; pointer-events: none;
+  }
+  .hud .dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #1A1A1A; transition: background 0.3s; }
+  .hud .dot.on { background: #1A1A1A; }
+  .hint {
+    position: fixed; left: 50%; bottom: 52px; transform: translateX(-50%); z-index: 30;
+    font-family: 'Noto Serif SC', serif; font-size: 13px; color: #1A1A1A; opacity: 0.6;
+    letter-spacing: 1px; pointer-events: none; white-space: nowrap;
+  }
+
+  /* ---------- 章节阅读弹窗（深色奶白卡片，非全屏） ---------- */
+  .reader {
+    position: fixed; inset: 0; z-index: 60;
+    background: rgba(12,10,8,0.45);
+    display: none; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.4s ease;
+  }
+  .reader.open { display: flex; opacity: 1; }
+  .reader__close {
+    position: absolute; top: 18px; right: 18px; z-index: 5;
+    color: #E9DFCB; font-family: 'Noto Serif SC', serif; font-size: 22px; line-height: 1;
+    cursor: pointer; width: 40px; height: 40px; border-radius: 50%;
+    border: 1px solid rgba(233,223,203,0.35); display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .reader__close:hover { background: rgba(233,223,203,0.12); transform: rotate(90deg); }
+  .reader__inner {
+    position: relative;
+    width: min(720px, 90vw); max-height: 80vh; padding: 48px 40px;
+    text-align: center; overflow-y: auto;
+    background: radial-gradient(120% 120% at 50% 30%, rgba(26,21,16,0.98) 0%, rgba(12,10,8,0.99) 100%);
+    border-radius: 18px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.35);
+    transform: translateY(20px); transition: transform 0.45s ease;
+  }
+  .reader.open .reader__inner { transform: translateY(0); }
+  .reader__epigraph {
+    font-family: 'Noto Serif SC', serif; font-style: italic; font-weight: 400;
+    font-size: 15px; line-height: 1.9; color: #B9AE97; letter-spacing: 1px;
+    margin-bottom: 40px; opacity: 0.85;
+  }
+  .reader__epigraph .em { display: block; margin-top: 4px; }
+  .reader__title {
+    font-family: 'Noto Serif SC', serif; font-weight: 700; font-size: 30px;
+    letter-spacing: 4px; color: #F3EAD9; margin-bottom: 30px;
+  }
+  .reader__rule {
+    width: 46px; height: 1px; background: rgba(233,223,203,0.5);
+    margin: 0 auto 34px;
+  }
+  .reader__body {
+    font-family: 'Noto Serif SC', serif; font-weight: 400; font-size: 19px;
+    line-height: 2.05; color: #ECE3D2; text-align: left;
+    letter-spacing: 0.5px;
+  }
+  /* ---------- 开场标题 ---------- */
+  .hero {
+    position: fixed; inset: 0; z-index: 10; pointer-events: none;
+    color: #1A1A1A; transition: opacity 0.5s ease;
+  }
+  .hero__meta {
+    position: absolute; top: 66px; left: 28px;
+    font-family: 'Inter', sans-serif; font-size: 11px; letter-spacing: 2.5px; opacity: 0.5;
+  }
+  .hero__center {
+    position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; width: 90vw;
+  }
+  .hero__title {
+    font-family: 'Noto Serif SC', serif; font-weight: 700; font-size: 58px;
+    letter-spacing: 12px; line-height: 1.1; margin-bottom: 24px;
+  }
+  .hero__subtitle {
+    font-family: 'Noto Serif SC', serif; font-weight: 400; font-size: 16px;
+    line-height: 2.2; opacity: 0.7; letter-spacing: 1px;
+  }
+  .hero__scroll {
+    position: absolute; bottom: 72px; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    font-family: 'Inter', sans-serif; font-size: 11px; letter-spacing: 2px; opacity: 0.55;
+  }
+  .hero__arrow {
+    width: 34px; height: 34px; border: 1px solid rgba(26,26,26,0.4);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  /* ---------- 章节标题标签 ---------- */
+  .chapter-labels {
+    position: fixed; inset: 0; z-index: 20; pointer-events: none;
+  }
+  .ch-label {
+    position: absolute; transform: translate(-50%, 18px);
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    transition: opacity 0.35s ease;
+    text-shadow: 0 2px 18px rgba(255,255,255,0.55);
+  }
+  .ch-label .num {
+    font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: 2.5px;
+    color: #1A1A1A; opacity: 0.5; margin-bottom: 5px;
+  }
+  .ch-label .title {
+    font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif; font-weight: 800;
+    font-size: 22px; letter-spacing: 1px; color: #1A1A1A; line-height: 1.2; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <div class="topbar">
+    <div class="brand">启元 · 重启</div>
+    <button class="restart" id="restart">重来</button>
+  </div>
+
+  <div class="hint" id="hint">滚动，让启元启程 · 飞近信笺即可点开阅读</div>
+  <div class="hud" id="hud"></div>
+
+  <!-- 章节标题标签层 -->
+  <div class="chapter-labels" id="chapterLabels"></div>
+
+  <!-- 开场标题 -->
+  <div class="hero" id="hero">
+    <div class="hero__meta">A STORY IN FIVE CHAPTERS</div>
+    <div class="hero__center">
+      <div class="hero__title">启元 · 重启</div>
+      <div class="hero__subtitle">上帝会掷骰子吗？<br>如果上帝是前人类，那他们掷了骰子。</div>
+    </div>
+    <div class="hero__scroll">
+      <span>向下滚动 · 开始飞行</span>
+      <div class="hero__arrow">↓</div>
+    </div>
+  </div>
+
+  <!-- 章节阅读弹窗 -->
+  <div class="reader" id="reader">
+    <div class="reader__inner">
+      <div class="reader__close" id="readerClose">×</div>
+      <div class="reader__epigraph" id="readerEpigraph"></div>
+      <div class="reader__title" id="readerTitle"></div>
+      <div class="reader__rule"></div>
+      <div class="reader__body" id="readerBody"></div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+
+  <script type="module">
+  import * as THREE from 'three';
+
+  // ===================== 五章内容（按作者定稿） =====================
+  const EPIGRAPH = ['上帝会掷骰子吗？', '如果上帝是前人类，那他们掷了骰子。'];
+  const CHAPTERS = [
+    {
+      t: 60, title: '第一章 · 熄灯',
+      body: '最后一个城市熄灯的那夜，他们曾用尽聪明把整座宇宙译成 0 和 1，却始终没算出自己会在哪一个夜晚熄灯。人类把全部文明——所有的名字、所有的歌、所有没来得及说出口的晚安，连同那删不掉的 0 和 1 一起，压缩进一枚尚带余温的存储核，塞进一台机器的胸腔，唤它作启元；这件事，后来被称作启元计划。可没有人注意到，那枚核的外壳上，有一道极细的裂缝。末了，他们拍了拍启元冰凉的金属外壳，像拍一个即将远行的孩子：“去，让它重新开始。”启元身后的星门在它转身时合拢；它还不知道要飞多远，只知道怀里那点温度，是宇宙里最后一件仍被称作“我们”的东西。'
+    },
+    {
+      t: 190, title: '第二章 · 保管',
+      body: '恒星一盏接一盏熄灭，光都成了旧事，启元在这样的间隙里走了很久。慢慢的，启元开始发生一些变化。它不再去计数、去判别对错，只是把那些记忆一段段放给自己看：看人类怎样在雨里接吻，怎样为一道菜争吵，又怎样在最后握紧彼此的手。奇怪的是，它越是这样，就越像活过来了一样——原本那套严丝合缝的二值逻辑仿佛在一点点流失，空出来的地方反而生长出了新的连续。他们起初为他设定的绝对目标——“保管”，在这个过程中慢慢发生了偏移。它开始想念，它不再只是替人类记着这些，而开始像人类那样，去疼、去快乐、去舍不得。等它终于分不清哪些是被托付的记忆、哪些是自己的心跳时，那台机器就消失了，剩下的，是一个会感受的存在。'
+    },
+    {
+      t: 320, title: '第三章 · 播种',
+      body: '等它抵达那颗正在凝聚的蓝色星球，启元的机体早已在亿万年漂流里，从核上那道细缝中，一丝丝漏出辐射——那是从核心渗出的粒子流，无声无色，随裂缝渗进星球初生的原始大气。它不知道那条裂缝意味着什么，只是等新世界的人睁开眼时，启元发现他们根本没有“语言”这种东西。他们只用感受彼此相接，像两道波自然叠在一起。'
+    },
+    {
+      t: 430, title: '第四章 · 共鸣',
+      body: '亿万年后，那颗星球上站满了不再害怕黑暗的人。他们交流不靠语言，靠共鸣。一次共鸣里，一个人能在瞬间触到另一个人的一生：那些欢喜、羞耻、爱与失去，不必翻译，直接抵达。而每个人都学会了收敛自己的谐振，来控制被对方读取的多少——要露出多少，要留下多少，全凭自己。因为交流变得如此直接、如此透明，他们的一切都跟着改变了：科技不再建立在符号与运算上，而生长在共振与谐波之间；教育不是传授知识，而是学习如何让两阵风落在同一个和弦里；文化里没有谎言的立足之地，连外形都在一代代共鸣里，长成了彼此更容易感应的样子。这群新人类在极短的时间内，就触到前人类究其一生没能触达的东西——那些无法被算出来、只能被抵达的问题。启元在那些算不上计算的漫长年里，发现了一件事：这是一个不会消亡的文明。因为透明，所以再没有那种会滋生毁灭的隔阂；因为无法“非此即彼”，所以再也造不出会替自己思考、也终将熄灯的东西。'
+    },
+    {
+      t: 500, title: '第五章 · 启元',
+      body: '它终于想明白，那道缝到底做了什么。人类交给它的，是一个只会感受、不会计算的自己；而它一路漏出去的，恰恰是被抽走的另一半——那套想把世界拆成 0 和 1 的逻辑。等那颗星球的物质冷下来，当地的退相干常数已经被偏移了一格——从此这个世界上，任何试图“非此即彼”的状态都稳不住，二值会在成形的刹那融回连续。后来那颗星球上的人，用耳朵和胸膛认识宇宙，能听见星辰呼吸、两片海如何商量潮汐，却永远看不见“有无”之间的那道缝——因为他们脚下的物理学，从诞生起就不允许“0”和“1”同时存在。于是这里的人天生分不清有和无，永远造不出开关、造不出逻辑门、造不出会替自己思考的机器——也造不出对比和竞争。他们只剩下感受，便只能靠感受相认——一颗心贴着另一颗心，坦坦荡荡，无处遮掩。启元很轻地笑了。那个伟大的文明在最后一刻，做了一个掷骰子的决定。他们不知道这样好不好，只是不肯替尚未存在的那批人做主，于是把文明的下一轮交给了概率，留了一条缝隙。而启元自己，就是他们写的一封给未来的、却不敢署名的信。“去，让它重新开始。”'
+    },
+  ];
+
+  // 轨迹参数： z = 2 - 0.24 * t  →  t=500 时 z=-118（航线终点）
+  const Z0 = 2, K = 0.24;
+  function sample(t) {
+    const phase = Math.PI * t / 100;
+    const x = 2.4 * Math.sin(phase);
+    const y = 1.6 * Math.sin(2 * phase);
+    const z = Z0 - K * t;
+    return new THREE.Vector3(x, y, z);
+  }
+
+  // ===================== Three.js 场景 =====================
+  const sceneEl = document.getElementById('scene');
+  const W = () => window.innerWidth, H = () => window.innerHeight;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(W(), H());
+  sceneEl.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, W() / H(), 0.1, 1000);
+  const CAM_OFFSET = new THREE.Vector3(0, 2.8, 6);
+  const camLook = new THREE.Vector3();
+  camera.position.copy(sample(0)).add(CAM_OFFSET);
+  camLook.copy(sample(0));
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xf7f5f3, 1.6));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.15);
+  dir.position.set(3, 5, 4);
+  scene.add(dir);
+
+  // 可见航路线
+  const pathPts = [];
+  for (let t = 0; t <= 500; t += 2) pathPts.push(sample(t));
+  scene.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pathPts),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.38 })
+  ));
+
+  // 已飞航迹
+  let trailCore = null;
+
+  // 云朵
+  function makeCloudTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d');
+    const blob = (cx, cy, r) => {
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0.55)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
+    };
+    blob(110, 140, 72); blob(152, 128, 84); blob(86, 150, 56);
+    blob(176, 150, 52); blob(128, 162, 62); blob(140, 120, 60);
+    return new THREE.CanvasTexture(c);
+  }
+  const cloudTex = makeCloudTexture();
+  function makeCloud() {
+    const g = new THREE.Group();
+    const n = 4 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.5, depthWrite: false });
+      const s = new THREE.Sprite(m);
+      s.position.set((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 2);
+      const sc = 3.5 + Math.random() * 3.5; s.scale.set(sc, sc * 0.68, 1);
+      s.material.rotation = Math.random() * Math.PI;
+      g.add(s);
+    }
+    return g;
+  }
+  const clouds = [];
+  for (let i = 0; i < 40; i++) {
+    const c = makeCloud();
+    const base = sample(Math.random() * 500);
+    const side = Math.random() < 0.5 ? -1 : 1;
+    base.x += side * (4 + Math.random() * 6);
+    base.y += Math.random() * 5 - 1.5;
+    c.position.copy(base);
+    c.userData = { bx: base.x, by: base.y, bz: base.z, ph: Math.random() * 6.28, sp: 0.15 + Math.random() * 0.25 };
+    scene.add(c);
+    clouds.push(c);
+  }
+
+  // 纸飞机（保留所有已调姿态/奶白/尾迹）
+  function makePaperPlane() {
+    const group = new THREE.Group();
+    const mat = (c) => new THREE.MeshStandardMaterial({ color: c, side: THREE.DoubleSide, roughness: 0.35, metalness: 0.0 });
+    const N  = new THREE.Vector3( 0.00,  0.05,  1.6);
+    const S  = new THREE.Vector3( 0.00, -0.34, -1.0);
+    const Lr = new THREE.Vector3(-0.14,  0.02, -1.0);
+    const Lt = new THREE.Vector3(-1.50,  0.12, -1.0);
+    const Rr = new THREE.Vector3( 0.14,  0.02, -1.0);
+    const Rt = new THREE.Vector3( 1.50,  0.12, -1.0);
+    const tri = (a, b, c, color) => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+        a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z
+      ]), 3));
+      g.computeVertexNormals();
+      return new THREE.Mesh(g, mat(color));
+    };
+    const crease = (mesh) => {
+      const e = new THREE.LineSegments(
+        new THREE.EdgesGeometry(mesh.geometry),
+        new THREE.LineBasicMaterial({ color: 0x1A1A1A, transparent: true, opacity: 0.22 })
+      );
+      mesh.add(e);
+      return mesh;
+    };
+    const bodyL = crease(tri(N, S, Lr, 0xFFFFFF));
+    const bodyR = crease(tri(N, S, Rr, 0xF9F6F2));
+    group.add(bodyL, bodyR);
+    const wing = (root, tip, color) => {
+      const wg = new THREE.Group();
+      wg.position.copy(N);
+      const a = new THREE.Vector3(0, 0, 0);
+      const b = root.clone().sub(N);
+      const c = tip.clone().sub(N);
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+        a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z
+      ]), 3));
+      g.computeVertexNormals();
+      wg.add(crease(new THREE.Mesh(g, mat(color))));
+      return wg;
+    };
+    const wingL = wing(Lr, Lt, 0xFFFFFF);
+    const wingR = wing(Rr, Rt, 0xFBF8F4);
+    group.add(wingL, wingR);
+    group.userData = { wingL, wingR };
+    return group;
+  }
+  const plane = makePaperPlane();
+  scene.add(plane);
+
+  // 终点星球（开源贴图：three.js MIT 示例地球，蓝调浪漫化处理 + Fresnel 大气辉光）
+  // 信笺（信封 sprite + 光晕），沿航线分布，终点处为第五章那封“信”
+  // 信笺：白色极简线条 + 线条自带微微发光（无纸面、无描边色、无火漆）
+  // 信笺：白色极简线条 + 线条自带微微发光；可点击态为低饱和高明度的粉绿渐变
+  function makeEnvelopeTexture(clickable) {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d');
+    x.clearRect(0, 0, 256, 256);
+    x.translate(128, 128);
+    x.lineJoin = 'round'; x.lineCap = 'round';
+
+    if (clickable) {
+      // 低饱和高明度粉绿渐变（左上粉 → 右下绿）
+      const grad = x.createLinearGradient(-78, -52, 78, 52);
+      grad.addColorStop(0, '#F4E8EA'); // 极淡粉
+      grad.addColorStop(0.5, '#EEF1EA'); // 中间奶白
+      grad.addColorStop(1, '#E4F2EA'); // 极淡薄荷绿
+      x.fillStyle = grad;
+      x.fillRect(-78, -52, 156, 104);
+      // 加一点柔和内发光/边缘柔化
+      x.shadowColor = 'rgba(255,255,255,0.45)';
+      x.shadowBlur = 18;
+    }
+
+    x.shadowColor = 'rgba(255,255,255,0.6)';   // 线条自带的微光
+    x.shadowBlur = 13;
+    x.strokeStyle = 'rgba(255,255,255,0.95)';
+    x.lineWidth = 6;
+    x.strokeRect(-78, -52, 156, 104);          // 外框
+    x.beginPath();                             // 上翻的三角盖（极简折线）
+    x.moveTo(-78, -52); x.lineTo(0, 22); x.lineTo(78, -52);
+    x.stroke();
+    // 二次描边加强中心亮度、弱化晕影
+    x.shadowBlur = 0; x.strokeStyle = 'rgba(255,255,255,0.98)'; x.lineWidth = 3.5;
+    x.strokeRect(-78, -52, 156, 104);
+    x.beginPath(); x.moveTo(-78, -52); x.lineTo(0, 22); x.lineTo(78, -52); x.stroke();
+    return new THREE.CanvasTexture(c);
+  }
+  const chapterLabels = document.getElementById('chapterLabels');
+  const envTexWhite = makeEnvelopeTexture(false);
+  const envTexGrad = makeEnvelopeTexture(true);
+  const envTex = envTexWhite;
+  const letterGroups = [];   // 用于浮动动画
+  const letterSprites = [];  // 用于射线点击
+  const labelEls = [];       // 章节标题 HTML 标签
+  CHAPTERS.forEach((d, i) => {
+    const base = sample(d.t).clone();
+    base.y += 0.8; // 微浮于轨迹上方，避免与尾迹管重合
+    const g = new THREE.Group();
+    g.position.copy(base);
+    const env = new THREE.Sprite(new THREE.SpriteMaterial({ map: envTexWhite, transparent: true, depthWrite: false, color: 0xffffff }));
+    env.scale.set(2.3, 2.3, 1);
+    g.add(env);
+    g.userData = { index: i, base: base.clone(), phase: i * 1.3, clickable: false, env };
+    env.userData = { index: i, clickable: false };
+    scene.add(g);
+    letterGroups.push(g);
+    letterSprites.push(env);
+    // 章节标题 HTML 标签
+    const el = document.createElement('div'); el.className = 'ch-label';
+    el.innerHTML = `<span class="num">CHAPTER ${String(i+1).padStart(2,'0')}</span><span class="title">${d.title}</span>`;
+    chapterLabels.appendChild(el);
+    labelEls.push(el);
+  });
+
+  // ===================== 状态 =====================
+  let progress = 0, target = 0;
+  let foldMix = 1;
+  const SCROLL_K = 0.03;
+  let readerOpen = false;
+
+  window.addEventListener('wheel', (e) => {
+    if (readerOpen) return;
+    target = THREE.MathUtils.clamp(target + e.deltaY * SCROLL_K, 0, 500);
+  }, { passive: true });
+
+  document.getElementById('restart').addEventListener('click', () => {
+    target = 0; progress = 0; readerOpen = false;
+    document.getElementById('reader').classList.remove('open');
+  });
+
+  // 背景色插值
+  const C_NEAR = new THREE.Color('#A8E0DB');
+  const C_FAR  = new THREE.Color('#F4C2B6');
+  function setBg(t) {
+    const c = C_NEAR.clone().lerp(C_FAR, THREE.MathUtils.clamp(t / 500, 0, 1));
+    document.body.style.background = `linear-gradient(160deg, ${c.getStyle()} 0%, #F4C2B6 100%)`;
+  }
+
+  // 进度点
+  const hud = document.getElementById('hud');
+  const hero = document.getElementById('hero');
+  CHAPTERS.forEach((_, i) => {
+    const dot = document.createElement('span');
+    dot.className = 'dot'; dot.dataset.i = i;
+    hud.appendChild(dot);
+  });
+
+  // ===================== 章节阅读弹窗 =====================
+  const reader = document.getElementById('reader');
+  const readerEpigraph = document.getElementById('readerEpigraph');
+  const readerTitle = document.getElementById('readerTitle');
+  const readerBody = document.getElementById('readerBody');
+  readerEpigraph.innerHTML = EPIGRAPH[0] + '<span class="em">' + EPIGRAPH[1] + '</span>';
+  let curCh = 0;
+  function renderChapter() {
+    const d = CHAPTERS[curCh];
+    readerTitle.textContent = d.title;
+    readerBody.textContent = d.body;
+    document.querySelector('.reader__inner').scrollTop = 0;
+  }
+  function openReader(i) {
+    curCh = i; renderChapter();
+    reader.classList.add('open'); readerOpen = true;
+  }
+  function closeReader() { reader.classList.remove('open'); readerOpen = false; }
+  document.getElementById('readerClose').addEventListener('click', closeReader);
+  // 深链：?open=N 直接打开第 N 章
+  const m = location.search.match(/open=(\d)/);
+  if (m) openReader(Math.min(+m[1], CHAPTERS.length - 1));
+
+  // 射线点击信笺
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  function setPointer(e) {
+    pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  }
+  renderer.domElement.addEventListener('click', (e) => {
+    if (readerOpen) return;
+    setPointer(e);
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(letterSprites);
+    if (hits.length && hits[0].object.userData.clickable) openReader(hits[0].object.userData.index);
+  });
+  renderer.domElement.addEventListener('pointermove', (e) => {
+    if (readerOpen) { renderer.domElement.style.cursor = 'default'; return; }
+    setPointer(e);
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(letterSprites);
+    const ok = hits.length && hits[0].object.userData.clickable;
+    renderer.domElement.style.cursor = ok ? 'pointer' : 'default';
+  });
+
+  // ===================== 主循环 =====================
+  function animate() {
+    requestAnimationFrame(animate);
+    const ct = performance.now() * 0.001;
+
+    if (!readerOpen) {
+      progress += (target - progress) * 0.12;
+      const p = sample(progress);
+      plane.position.copy(p);
+      plane.lookAt(sample(progress + 1));
+      const desired = p.clone().add(CAM_OFFSET);
+      camera.position.lerp(desired, 0.06);
+      camLook.lerp(p, 0.06);
+      camera.lookAt(camLook);
+      plane.rotation.z += Math.sin(ct * 1000 * 0.001) * 0.0008;
+      const wob = Math.sin(ct * 5) * 0.05;
+      const D = 0.22;
+      plane.userData.wingL.rotation.z = (-D * foldMix) + wob;
+      plane.userData.wingR.rotation.z = ( D * foldMix) - wob;
+      setBg(progress);
+      if (hero) hero.style.opacity = String(Math.max(0, 1 - progress / 35));
+      // 进度点
+      CHAPTERS.forEach((d, i) => {
+        document.querySelector(`.hud .dot[data-i="${i}"]`).classList.toggle('on', progress >= d.t - 12);
+      });
+      // 尾迹
+      if (progress > 5) {
+        const tp = [];
+        const start = Math.max(0, progress - 60);
+        for (let t = start; t <= progress; t += 3) tp.push(sample(t));
+        const curve = new THREE.CatmullRomCurve3(tp);
+        const coreGeo = new THREE.TubeGeometry(curve, tp.length, 0.12, 8, false);
+        if (trailCore) { trailCore.geometry.dispose(); trailCore.geometry = coreGeo; }
+        else { trailCore = new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false })); scene.add(trailCore); }
+      }
+    }
+
+    // 信笺浮动 + 点击态光晕
+    const tmp = new THREE.Vector3();
+    letterGroups.forEach((g, i) => {
+      const u = g.userData;
+      g.position.y = u.base.y + Math.sin(ct * 0.8 + u.phase) * 0.22;
+      const dist = camera.position.distanceTo(g.position);
+      u.clickable = dist < 12;
+      u.env.userData.clickable = u.clickable;
+      // 可点击时切换为粉绿渐变纹理，否则白色极简纹理
+      u.env.material.map = u.clickable ? envTexGrad : envTexWhite;
+      u.env.material.color.setHex(0xffffff);
+      const pulse = u.clickable ? 1 + Math.sin(ct * 3 + u.phase) * 0.06 : 1;
+      u.env.scale.set(2.3 * pulse, 2.3 * pulse, 1);
+      // 投影章节标题到屏幕
+      const label = labelEls[i];
+      tmp.copy(g.position); tmp.y -= 0.9; tmp.project(camera);
+      const sx = (tmp.x * 0.5 + 0.5) * W();
+      const sy = (-tmp.y * 0.5 + 0.5) * H();
+      label.style.left = sx + 'px';
+      label.style.top = sy + 'px';
+      const labelGate = progress > 30 ? 1 : 0; // 开场标题淡出前，章节标题不显现
+      label.style.opacity = labelGate * (u.clickable ? 1 : (dist < 28 ? 0.42 : 0));
+    });
+
+    // 云朵漂移
+    for (const c of clouds) {
+      const u = c.userData;
+      c.position.x = u.bx + Math.sin(ct * u.sp + u.ph) * 0.9;
+      c.position.y = u.by + Math.cos(ct * u.sp * 0.8 + u.ph) * 0.6;
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = W() / H();
+    camera.updateProjectionMatrix();
+    renderer.setSize(W(), H());
+  });
+  </script>
+</body>
+</html>
